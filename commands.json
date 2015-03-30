@@ -1,0 +1,19 @@
+{
+    "commands" :[
+        {
+            "name" : "test.php",
+            "run" : "php /usr/share/nginx/html/hub_local/src/Hub/Api/test.php",
+            "threads_number": "4",
+            "threads_time" : "1",
+            "batches_time" : "10"
+        },
+        {
+            "name" : "test.php",
+            "run" : "python /usr/share/nginx/html/hub_local/agents/agent.py -c \"php /usr/share/nginx/html/hub_local/src/Hub/Api/test.php\" -n 3 -b 2",
+            "threads_number": "4",
+            "threads_time" : "1",
+            "batches_time" : "10"
+        }
+    ]
+}
+
