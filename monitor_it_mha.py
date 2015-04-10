@@ -63,7 +63,7 @@ def print_help():
     print '-k name    kill the process belong to an action item'
     print '-k name_pid    kill the process belong to an action item'
     print '-r name    run the process belong to an action item'
-    print '-q name    run the process belong to an action item without taking care of one instance'
+    print '-e name    execute the process belong to an action item without taking care of one instance'
     print
 
 
@@ -121,28 +121,35 @@ def show_command_list(command_json_list, print_this=None):
 
 
 def show_process_report(command_json_list, just_this=None, subtree=False, kill=False):
+
     any_process = False
     for json_object in command_json_list["commands"]:
         if just_this is not None:
-            if json_object['name'] != (just_this.split('_'))[0].lower():
+            if json_object['name'] != (just_this.split('='))[0].lower():
                 continue
 
-        process = check_process(json_object["run"])
+        run_command = create_agent_arguments(json_object)
+        process = check_process(run_command.replace('"', ''))
         for p in process:
             if subtree or kill:
                 rg = re.compile("\s{2,}")
                 replaced_command = rg.sub('||:||', p)
                 replaced_command_array = replaced_command.split("||:||")
+
                 # show subtree
                 if subtree:
                     os.system('pstree -a -p ' + (replaced_command_array[1]))
 
                 if kill and just_this is not None and len(
-                        just_this.split('_')) <= 1:  # if arg is -k but no PID number provided
+                        just_this.split('=')) <= 1:  # if arg is -k but no PID number provided
                     os.system('kill ' + (replaced_command_array[1]))
-                elif kill and just_this is not None and len(just_this.split('_')) >= 1 and replaced_command_array[1] == \
-                        (just_this.split('_'))[1]:  # if arg is -k and PID is provided
+
+                elif kill and just_this is not None and len(just_this.split('=')) >= 1 \
+                        and replaced_command_array[1] == (just_this.split('='))[1]:  # if arg is -k and PID is provided
+
+                    print replaced_command_array[1]
                     os.system('kill ' + (replaced_command_array[1]))
+
                 elif kill and just_this is None:  # if arg is --kill-all
                     os.system('kill ' + (replaced_command_array[1]))
 
@@ -166,9 +173,33 @@ def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
 
+def create_agent_arguments(command_json_list):
+    command_argument = []
+    agent_file = os.getcwd() + '/agent.py'
+
+    if not os.path.isfile(agent_file):
+        print
+        raise SystemExit("couldn't find the agent.py - please grab one from repository")
+
+    if "run" in command_json_list:
+        command_argument.append("python " + agent_file)
+        command_argument.append("-c " + '"' + str(command_json_list['run']) + '"')
+
+    if ("threads_number" in command_json_list) and command_json_list['threads_number'].isdigit():
+        command_argument.append("-n " + str(command_json_list['threads_number']))
+
+    if ("threads_time" in command_json_list) and (command_json_list["threads_time"].isdigit()):
+        command_argument.append("-t " + str(command_json_list["threads_time"]))
+
+    if ("batches_time" in command_json_list) and (command_json_list["batches_time"].isdigit()):
+        command_argument.append("-b " + str(command_json_list["batches_time"]))
+
+    return ' '.join(command_argument)
+
+
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hli:pt:k:r:q:", ["help", "kill-all"])
+        opts, args = getopt.getopt(argv, "hli:pt:k:r:e:", ["help", "kill-all"])
     except getopt.GetoptError:
         print_help()
         sys.exit(2)
@@ -206,19 +237,28 @@ def main(argv):
         elif o in "-r":
             run_process = True
             passed_arg = a
-        elif o in "-q":
+        elif o in "-e":
             run_any_way = True
             passed_arg = a
         else:
             sys.exit()
 
     command_file = os.getcwd() + '/commands.json'
+
+    if not os.path.isfile(command_file):
+        print
+        raise SystemExit("couldn't find the command.json - please create one in current directory")
+
     commands_file_content = read_command_file(command_file)
-    batch_to_run = read_json(commands_file_content)
 
-    # show_process_report(batch_to_run, 'pbsys_pbww', show_subtree)
-
-    # show_command_list(batch_to_run)
+    try:
+        batch_to_run = read_json(commands_file_content)
+    except Exception as err:
+        print
+        print "Following error happened during reading command.json:"
+        print
+        print err
+        raise SystemExit("could not convert command.json to json object")
 
     if show_all_command:
         show_command_list(batch_to_run)
@@ -235,28 +275,20 @@ def main(argv):
     else:
 
         for json_object in batch_to_run["commands"]:
-            command_argument = []
+
             if run_process or run_any_way:
                 if json_object["name"] != passed_arg:
                     continue
+            else:
+                if ("enable" in json_object) and not (str2bool(json_object["enable"])):
+                    continue
 
-            if ("threads_number" in json_object) and json_object['threads_number'].isdigit():
-                command_argument.append("-n " + str(json_object['threads_number']))
-
-            if ("threads_time" in json_object)and (json_object["threads_time"].isdigit()):
-                command_argument.append("-t " + str(json_object["threads_time"]))
-
-            if ("batches_time" in json_object) and (json_object["batches_time"].isdigit()):
-                command_argument.append("-b " + str(json_object["batches_time"]))
-
-            print ' '.join(command_argument)
-
-            process = check_process(json_object["run"])
+            run_command = create_agent_arguments(json_object)
+            process = check_process(run_command.replace('"', ''))
             if len(process) != 1 or run_any_way:
                 # run new process
-                if str2bool(json_object["enable"]) or run_any_way or run_process:
-                    # run_shell_command(json_object["run"])
-                    print None
+                run_shell_command(run_command)
+                print None
 
     os._exit(-1)
 
