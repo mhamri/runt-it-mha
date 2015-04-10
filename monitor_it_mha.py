@@ -137,9 +137,11 @@ def show_process_report(command_json_list, just_this=None, subtree=False, kill=F
                 if subtree:
                     os.system('pstree -a -p ' + (replaced_command_array[1]))
 
-                if kill and just_this is not None and len(just_this.split('_')) <= 1:  # if arg is -k but no PID number provided
+                if kill and just_this is not None and len(
+                        just_this.split('_')) <= 1:  # if arg is -k but no PID number provided
                     os.system('kill ' + (replaced_command_array[1]))
-                elif kill and just_this is not None and len(just_this.split('_')) >= 1 and replaced_command_array[1] == (just_this.split('_'))[1]:  # if arg is -k and PID is provided
+                elif kill and just_this is not None and len(just_this.split('_')) >= 1 and replaced_command_array[1] == \
+                        (just_this.split('_'))[1]:  # if arg is -k and PID is provided
                     os.system('kill ' + (replaced_command_array[1]))
                 elif kill and just_this is None:  # if arg is --kill-all
                     os.system('kill ' + (replaced_command_array[1]))
@@ -180,7 +182,6 @@ def main(argv):
     run_process = False
     run_any_way = False
     passed_arg = ''
-
 
     for o, a in opts:
         if o in ("-h", "--help"):
@@ -234,16 +235,28 @@ def main(argv):
     else:
 
         for json_object in batch_to_run["commands"]:
-
+            command_argument = []
             if run_process or run_any_way:
                 if json_object["name"] != passed_arg:
                     continue
+
+            if ("threads_number" in json_object) and json_object['threads_number'].isdigit():
+                command_argument.append("-n " + str(json_object['threads_number']))
+
+            if ("threads_time" in json_object)and (json_object["threads_time"].isdigit()):
+                command_argument.append("-t " + str(json_object["threads_time"]))
+
+            if ("batches_time" in json_object) and (json_object["batches_time"].isdigit()):
+                command_argument.append("-b " + str(json_object["batches_time"]))
+
+            print ' '.join(command_argument)
 
             process = check_process(json_object["run"])
             if len(process) != 1 or run_any_way:
                 # run new process
                 if str2bool(json_object["enable"]) or run_any_way or run_process:
-                    run_shell_command(json_object["run"])
+                    # run_shell_command(json_object["run"])
+                    print None
 
     os._exit(-1)
 
